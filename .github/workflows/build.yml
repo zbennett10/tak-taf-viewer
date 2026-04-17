@@ -1,0 +1,80 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp build/Release/taf-viewer.exe dist/ 2>/dev/null || true
+          find build -name "SDL2.dll" -exec cp {} dist/ \; 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taf-viewer-windows
+          path: dist/
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+      - name: Build
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
+      - name: Package
+        run: mkdir -p dist && cp build/taf-viewer dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taf-viewer-linux
+          path: dist/
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDL2
+        run: brew install sdl2
+      - name: Build
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
+      - name: Package
+        run: mkdir -p dist && cp build/taf-viewer dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taf-viewer-macos
+          path: dist/
+
+  release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Zip artifacts
+        run: |
+          cd artifacts/taf-viewer-windows && zip -r ../../taf-viewer-windows.zip . && cd ../..
+          cd artifacts/taf-viewer-linux && tar czf ../../taf-viewer-linux.tar.gz . && cd ../..
+          cd artifacts/taf-viewer-macos && tar czf ../../taf-viewer-macos.tar.gz . && cd ../..
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            taf-viewer-windows.zip
+            taf-viewer-linux.tar.gz
+            taf-viewer-macos.tar.gz
+          generate_release_notes: true
