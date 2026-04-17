@@ -4,14 +4,19 @@ project(taf-viewer C)
 set(CMAKE_C_STANDARD 11)
 
 find_package(SDL2 REQUIRED)
+find_package(Stb REQUIRED)
 
 add_executable(taf-viewer
     src/main.c
     src/taf.c
+    src/taf_write.c
+    src/png_io.c
+    src/editor.c
 )
 
 target_include_directories(taf-viewer PRIVATE
     ${CMAKE_SOURCE_DIR}/include
+    ${Stb_INCLUDE_DIR}
 )
 
 if(TARGET SDL2::SDL2)
